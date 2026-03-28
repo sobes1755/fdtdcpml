@@ -1,11 +1,12 @@
 #include "fdtdcpml.h"
-#include "mdio.h"
+#include "mdspanio.h"
 
 #include <iostream>
 #include <charconv>
 #include <optional>
 #include <cstring>
 #include <fstream>
+#include <numeric>
 
 int
 main(int argc, char *argv[])
@@ -37,58 +38,34 @@ main(int argc, char *argv[])
     std::optional<FDTDCPML> solver;
 
     try {
-
         solver.emplace(x_min, x_max, p_int, y_min, y_max, q_int, z_min, z_max, r_int);
-
     } catch (const std::exception& e) {
-
         std::cerr << "Memory allocation failed: " << e.what() << "\n";
         return EXIT_FAILURE;
-
     }
 
-    //
+    // Solving and saving middle slices with Ex values...
 
-    std::cout << "x_step = " << solver->x_step() << std::endl;
-    std::cout << "y_step = " << solver->y_step() << std::endl;
-    std::cout << "z_step = " << solver->z_step() << std::endl;
-    std::cout << "t_step = " << solver->t_step() << std::endl;
+    double x0 = std::midpoint(x_min, x_max);
+    double y0 = std::midpoint(y_min, y_max);
+    double z0 = std::midpoint(z_min, z_max);
 
-    // FDTDCPML...
+    auto [p0, q0, r0] = solver->Ex_xyz2pqr({x0, y0, z0});    
 
     solver->init();
 
-    for (size_t s = 0; s < 1024; ++s) {
-
-//        std::cout << "s = " << s << ", t = " << solver->t() << std::endl;
+    for (size_t s = 0; s < 32; ++s) {
 
         solver->step();
 
-//        if (s % 16 == 0) {
-
-            std::ofstream ofs(std::format("{}.{:d}.bin", "../out.bin/Ex", s), std::ios::binary);
-
-            if (ofs.is_open()) {
-
-//                auto sliceRaw = std::submdspan(solver->Ez,
-//                    std::strided_slice{.offset = 0, .extent = solver->sizeX, .stride = 1},
-//                    std::strided_slice{.offset = 0, .extent = solver->sizeY, .stride = 1},
-//                    rickerEzZ);
-
-                auto sliceRaw = std::submdspan(solver->Ex(),
-                    std::full_extent,
-                    std::full_extent,
-                    61);
-
-                auto sliceScaled = std::mdspan(sliceRaw.data_handle(),
-                    sliceRaw.mapping(), scaling_accessor<double>{solver->x_step()});
-
-                writeSlice(ofs, sliceScaled);
-
-                ofs.close();
-
-//            }
-
+        if (std::ofstream ofs{std::format("{}.{:d}.bin", "../out.bin/Ex.YZ", s), std::ios::binary}) {
+            fdtdcpml::write_mdspan(ofs, solver->slice(FDTDCPML::ECOMP::Ex, FDTDCPML::EPQRS::P, p0));
+        }
+        if (std::ofstream ofs{std::format("{}.{:d}.bin", "../out.bin/Ex.XZ", s), std::ios::binary}) {
+            fdtdcpml::write_mdspan(ofs, solver->slice(FDTDCPML::ECOMP::Ex, FDTDCPML::EPQRS::Q, q0));
+        }
+        if (std::ofstream ofs{std::format("{}.{:d}.bin", "../out.bin/Ex.XY", s), std::ios::binary}) {
+            fdtdcpml::write_mdspan(ofs, solver->slice(FDTDCPML::ECOMP::Ex, FDTDCPML::EPQRS::R, r0));
         }
 
     }

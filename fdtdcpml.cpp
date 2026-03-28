@@ -5,6 +5,7 @@
 #include <ranges>
 #include <algorithm>
 #include <execution>
+#include <print>
 
 // "Premature optimization is the root of all evil". Donald Knuth.
 
@@ -20,39 +21,52 @@ void FDTDCPML::init()
 
 void FDTDCPML::step() {
 
-    #ifdef DEBUG
-
-    this->minmax();
-
-    std::cout << "t =  " << t_ << std::endl;
-
-    std::cout << "Hx_min =  " << Hx_min << ", Hx_max = " << Hx_max << std::endl;
-    std::cout << "Hy_min =  " << Hy_min << ", Hy_max = " << Hy_max << std::endl;
-    std::cout << "Hz_min =  " << Hz_min << ", Hz_max = " << Hz_max << std::endl;
-
-    std::cout << "Ex_min =  " << Ex_min << ", Ex_max = " << Ex_max << std::endl;
-    std::cout << "Ey_min =  " << Ey_min << ", Ey_max = " << Ey_max << std::endl;
-    std::cout << "Ez_min =  " << Ez_min << ", Ez_max = " << Ez_max << std::endl;
-
-    #endif
-
     fdtd_H(); 
 
 //    H_source();
 
-    cpml_x_l_H(); cpml_x_h_H();
-    cpml_y_l_H(); cpml_y_h_H();
-    cpml_z_l_H(); cpml_z_h_H();
+//    cpml_x_l_H(); cpml_x_h_H();
+//    cpml_y_l_H(); cpml_y_h_H();
+//    cpml_z_l_H(); cpml_z_h_H();
 
     fdtd_E();
 
 //    E_source();
 
-    cpml_x_l_E(); cpml_x_h_E();
-    cpml_y_l_E(); cpml_y_h_E();
-    cpml_z_l_E(); cpml_z_h_E();
+//    cpml_x_l_E(); cpml_x_h_E();
+//    cpml_y_l_E(); cpml_y_h_E();
+//    cpml_z_l_E(); cpml_z_h_E();
 
     t_ += t_step_;
+
+    #ifdef DEBUG
+
+    H_minmax();
+    E_minmax();
+
+    std::print("t = {},\n\n", t_);
+
+    std::print("Hx_min = {} ({}, {}, {}), Hx_max = {} ({}, {}, {}),\n",
+        Hx_min, Hx_min_pqr.p, Hx_min_pqr.q, Hx_min_pqr.r,
+        Hx_max, Hx_max_pqr.p, Hx_max_pqr.q, Hx_max_pqr.r);
+    std::print("Hy_min = {} ({}, {}, {}), Hy_max = {} ({}, {}, {}),\n",
+        Hy_min, Hy_min_pqr.p, Hy_min_pqr.q, Hy_min_pqr.r,
+        Hy_max, Hy_max_pqr.p, Hy_max_pqr.q, Hy_max_pqr.r);
+    std::print("Hz_min = {} ({}, {}, {}), Hz_max = {} ({}, {}, {}),\n",
+        Hz_min, Hz_min_pqr.p, Hz_min_pqr.q, Hz_min_pqr.r,
+        Hz_max, Hz_max_pqr.p, Hz_max_pqr.q, Hz_max_pqr.r);
+
+    std::print("Ex_min = {} ({}, {}, {}), Ex_max = {} ({}, {}, {}),\n",
+        Ex_min, Ex_min_pqr.p, Ex_min_pqr.q, Ex_min_pqr.r,
+        Ex_max, Ex_max_pqr.p, Ex_max_pqr.q, Ex_max_pqr.r);
+    std::print("Ey_min = {} ({}, {}, {}), Ey_max = {} ({}, {}, {}),\n",
+        Ey_min, Ey_min_pqr.p, Ey_min_pqr.q, Ey_min_pqr.r,
+        Ey_max, Ey_max_pqr.p, Ey_max_pqr.q, Ey_max_pqr.r);
+    std::print("Ez_min = {} ({}, {}, {}), Ez_max = {} ({}, {}, {}).\n\n",
+        Ez_min, Ez_min_pqr.p, Ez_min_pqr.q, Ez_min_pqr.r,
+        Ez_max, Ez_max_pqr.p, Ez_max_pqr.q, Ez_max_pqr.r);
+
+    #endif
 
 }
 
@@ -88,25 +102,25 @@ FDTDCPML::FDTDCPML(
     z_step_{(z_max_ - z_min_) / (r_int_ - 1)},
     t_step_{std::min((t_max_ - t_min_) / (s_int_ - 1), 0.5 * t_step_default(x_step_, y_step_, z_step_))},
 
-    rawHx_    (p_ * (q_ - 1) * (r_ - 1), 0.0),
-    rawHxHx_  (p_ * (q_ - 1) * (r_ - 1), 0.0),
-    rawHxEyEz_(p_ * (q_ - 1) * (r_ - 1), 0.0),
-    rawHy_    ((p_ - 1) * q_ * (r_ - 1), 0.0),
-    rawHyHy_  ((p_ - 1) * q_ * (r_ - 1), 0.0),
-    rawHyEzEx_((p_ - 1) * q_ * (r_ - 1), 0.0),
-    rawHz_    ((p_ - 1) * (q_ - 1) * r_, 0.0),
-    rawHzHz_  ((p_ - 1) * (q_ - 1) * r_, 0.0),
-    rawHzExEy_((p_ - 1) * (q_ - 1) * r_, 0.0),
+    rawHx_    (p_ * (q_ - 1) * (r_ - 1)),
+    rawHxHx_  (p_ * (q_ - 1) * (r_ - 1)),
+    rawHxEyEz_(p_ * (q_ - 1) * (r_ - 1)),
+    rawHy_    ((p_ - 1) * q_ * (r_ - 1)),
+    rawHyHy_  ((p_ - 1) * q_ * (r_ - 1)),
+    rawHyEzEx_((p_ - 1) * q_ * (r_ - 1)),
+    rawHz_    ((p_ - 1) * (q_ - 1) * r_),
+    rawHzHz_  ((p_ - 1) * (q_ - 1) * r_),
+    rawHzExEy_((p_ - 1) * (q_ - 1) * r_),
 
-    rawEx_    ((p_ - 1) * q_ * r_, 0.0),
-    rawExEx_  ((p_ - 1) * q_ * r_, 0.0),
-    rawExHyHz_((p_ - 1) * q_ * r_, 0.0),
-    rawEy_    (p_ * (q_ - 1) * r_, 0.0),
-    rawEyEy_  (p_ * (q_ - 1) * r_, 0.0),
-    rawEyHzHx_(p_ * (q_ - 1) * r_, 0.0),
-    rawEz_    (p_ * q_ * (r_ - 1), 0.0),
-    rawEzEz_  (p_ * q_ * (r_ - 1), 0.0),
-    rawEzHxHy_(p_ * q_ * (r_ - 1), 0.0),
+    rawEx_    ((p_ - 1) * q_ * r_),
+    rawExEx_  ((p_ - 1) * q_ * r_),
+    rawExHyHz_((p_ - 1) * q_ * r_),
+    rawEy_    (p_ * (q_ - 1) * r_),
+    rawEyEy_  (p_ * (q_ - 1) * r_),
+    rawEyHzHx_(p_ * (q_ - 1) * r_),
+    rawEz_    (p_ * q_ * (r_ - 1)),
+    rawEzEz_  (p_ * q_ * (r_ - 1)),
+    rawEzHxHy_(p_ * q_ * (r_ - 1)),
 
     Hx_    (rawHx_.data(),     p_, q_ - 1, r_ - 1),
     HxHx_  (rawHxHx_.data(),   p_, q_ - 1, r_ - 1),
@@ -136,6 +150,87 @@ FDTDCPML::FDTDCPML(
     psi_z_h_(p_ - 1, q_ - 1, r_abs_h_, z_step_, t_step_)
 
 {
+
+    #ifdef DEBUG
+
+    std::print("x_min = {}, x_max = {}, y_min = {}, y_max = {}, z_min = {}, z_max = {};\n\n",
+        x_min_, x_max_, y_min_, y_max_, z_min_, z_max_);
+
+    std::print("p_ = {} = 1 + {} + {} + {} + 1,\n",
+        p_, p_abs_l_, p_int_, p_abs_h_);
+    std::print("q_ = {} = 1 + {} + {} + {} + 1,\n",
+        q_, q_abs_l_, q_int_, q_abs_h_);
+    std::print("r_ = {} = 1 + {} + {} + {} + 1;\n\n",
+        r_, r_abs_l_, r_int_, r_abs_h_);
+
+    std::print("x_step = {}, y_step = {}, z_step = {}, t_step = {},\n\n",
+        x_step_, y_step_, z_step_, t_step_);
+
+    H_minmax();
+    E_minmax();
+
+    std::print("t = {}, t_min = {}, t_max = {},\n\n", t_, t_min_, t_max_);
+
+    std::print("Hx_min = {} ({}, {}, {}), Hx_max = {} ({}, {}, {}),\n",
+        Hx_min, Hx_min_pqr.p, Hx_min_pqr.q, Hx_min_pqr.r,
+        Hx_max, Hx_max_pqr.p, Hx_max_pqr.q, Hx_max_pqr.r);
+    std::print("Hy_min = {} ({}, {}, {}), Hy_max = {} ({}, {}, {}),\n",
+        Hy_min, Hy_min_pqr.p, Hy_min_pqr.q, Hy_min_pqr.r,
+        Hy_max, Hy_max_pqr.p, Hy_max_pqr.q, Hy_max_pqr.r);
+    std::print("Hz_min = {} ({}, {}, {}), Hz_max = {} ({}, {}, {}),\n",
+        Hz_min, Hz_min_pqr.p, Hz_min_pqr.q, Hz_min_pqr.r,
+        Hz_max, Hz_max_pqr.p, Hz_max_pqr.q, Hz_max_pqr.r);
+
+    std::print("Ex_min = {} ({}, {}, {}), Ex_max = {} ({}, {}, {}),\n",
+        Ex_min, Ex_min_pqr.p, Ex_min_pqr.q, Ex_min_pqr.r,
+        Ex_max, Ex_max_pqr.p, Ex_max_pqr.q, Ex_max_pqr.r);
+    std::print("Ey_min = {} ({}, {}, {}), Ey_max = {} ({}, {}, {}),\n",
+        Ey_min, Ey_min_pqr.p, Ey_min_pqr.q, Ey_min_pqr.r,
+        Ey_max, Ey_max_pqr.p, Ey_max_pqr.q, Ey_max_pqr.r);
+    std::print("Ez_min = {} ({}, {}, {}), Ez_max = {} ({}, {}, {}).\n\n",
+        Ez_min, Ez_min_pqr.p, Ez_min_pqr.q, Ez_min_pqr.r,
+        Ez_max, Ez_max_pqr.p, Ez_max_pqr.q, Ez_max_pqr.r);
+
+    // Test views...
+
+    std::print("Ex_extent(0) = {}, p_ - 1 = {}, ", Ex_.extent(0), p_ - 1);
+    std::print("Ex_extent(1) = {}, q_ - 1 = {}, ", Ex_.extent(1), q_ - 1);
+    std::print("Ex_extent(2) = {}, r_ - 1 = {}.", Ex_.extent(2), r_ - 1);
+
+    auto d0 = std::views::iota((size_t) 0, Ex_.extent(0));
+    auto d1 = std::views::iota((size_t) 0, Ex_.extent(1));
+    auto d2 = std::views::iota((size_t) 0, Ex_.extent(2));
+
+    for (auto [i0, i1, i2] : std::views::cartesian_product(d0, d1, d2)) {
+        Ex_[i0, i1, i2] = 0.;
+        ExEx_[i0, i1, i2] = 0.;
+        ExHyHz_[i0, i1, i2] = 0.;
+        std::print("1 Ex_[{}, {}, {}] = {}, ", i0, i1, i2, Ex_[i0, i1, i2]);
+        std::print("ExEx_[{}, {}, {}] = {}, ", i0, i1, i2, ExEx_[i0, i1, i2]);
+        std::print("ExHyHz_[{}, {}, {}] = {}.\n", i0, i1, i2, ExHyHz_[i0, i1, i2]);
+    }
+
+    std::print("\n");
+
+    auto gridEx = std::views::cartesian_product(
+        std::views::iota((size_t) 0, p_ - 1),
+        std::views::iota((size_t) 1, q_ - 1),
+        std::views::iota((size_t) 1, r_ - 1));
+
+    std::for_each(gridEx.begin(), gridEx.end(), [&](auto tuple) {
+        auto [i0, i1, i2] = tuple;
+        Ex_[i0, i1, i2] = 0.;
+        ExEx_[i0, i1, i2] = 0.;
+        ExHyHz_[i0, i1, i2] = 0.;
+        std::print("2 Ex_[{}, {}, {}] = {}, ", i0, i1, i2, Ex_[i0, i1, i2]);
+        std::print("ExEx_[{}, {}, {}] = {}, ", i0, i1, i2, ExEx_[i0, i1, i2]);
+        std::print("ExHyHz_[{}, {}, {}] = {}.\n", i0, i1, i2, ExHyHz_[i0, i1, i2]);
+    });
+
+    std::print("\n");
+
+    #endif
+
 }
 
 void

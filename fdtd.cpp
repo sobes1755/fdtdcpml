@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <execution>
 
+#include <print>
+
 // "Premature optimization is the root of all evil". Donald Knuth.
 
 void FDTDCPML::fdtd_init_H()
@@ -90,7 +92,7 @@ void FDTDCPML::fdtd_init_E()
     // Ex grid dims are p_ - 1, q_, r_, but Ex is zero on Y and Z ends (PEC)...
 
     auto gridEx = std::views::cartesian_product(
-        std::views::iota((size_t) 0, p_),
+        std::views::iota((size_t) 0, p_ - 1),
         std::views::iota((size_t) 1, q_ - 1),
         std::views::iota((size_t) 1, r_ - 1));
 

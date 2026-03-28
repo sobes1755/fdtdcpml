@@ -1,16 +1,9 @@
 #include <vector>
 #include <experimental/mdspan>
 
-//#include <cmath>
-
 #include "fdtd.h"
 #include "cpml.h"
-
-#ifdef DEBUG
-    #define debug(x) std::cout << "[DEBUG] " << x << std::endl
-#else
-    #define debug(x)
-#endif
+#include "mdspanio.h"
 
 class FDTDCPML {
 private:
@@ -56,7 +49,6 @@ private:
     GridRaw rawHx_, rawHxHx_, rawHxEyEz_;
     GridRaw rawHy_, rawHyHy_, rawHyEzEx_;
     GridRaw rawHz_, rawHzHz_, rawHzExEy_;
-
     GridRaw rawEx_, rawExEx_, rawExHyHz_;
     GridRaw rawEy_, rawEyEy_, rawEyHzHx_;
     GridRaw rawEz_, rawEzEz_, rawEzHxHy_;
@@ -68,7 +60,6 @@ private:
     GridView Hx_, HxHx_, HxEyEz_;
     GridView Hy_, HyHy_, HyEzEx_;
     GridView Hz_, HzHz_, HzExEy_;
-
     GridView Ex_, ExEx_, ExHyHz_;
     GridView Ey_, EyEy_, EyHzHx_;
     GridView Ez_, EzEz_, EzHxHy_;
@@ -81,6 +72,10 @@ private:
     CPML psi_y_h_;
     CPML psi_z_l_;
     CPML psi_z_h_;
+
+    //
+
+    double t_ = 0.0;
 
 public:
 
@@ -100,6 +95,48 @@ public:
     auto Ex() const noexcept { return Ex_; }
     auto Ey() const noexcept { return Ey_; }
     auto Ez() const noexcept { return Ez_; }
+
+    //
+
+    enum class ECOMP { Hx, Hy, Hz, Ex, Ey, Ez };
+    enum class EPQRS { P, Q, R, S };
+    enum class EXYZT { X, Y, Z, T };
+
+    //
+
+    using ScaledSpan3D = std::mdspan<double, std::dextents<size_t, 3>, std::layout_right, fdtdcpml::ScalingAccessor<double>>;
+    using SlicedSpan2D = std::mdspan<double, std::dextents<size_t, 2>, std::layout_stride, fdtdcpml::ScalingAccessor<double>>;
+
+    SlicedSpan2D slice(ECOMP cmp, EPQRS pqr, size_t v) {
+
+        ScaledSpan3D scaled;
+        SlicedSpan2D sliced;
+
+        if (cmp == ECOMP::Hx) {
+            scaled = std::mdspan(Hx_.data_handle(), Hx_.mapping(), fdtdcpml::ScalingAccessor<double>{x_step_});
+        } else if (cmp == ECOMP::Hy) {
+            scaled = std::mdspan(Hy_.data_handle(), Hy_.mapping(), fdtdcpml::ScalingAccessor<double>{y_step_});
+        } else if (cmp == ECOMP::Hz) {
+            scaled = std::mdspan(Hz_.data_handle(), Hz_.mapping(), fdtdcpml::ScalingAccessor<double>{z_step_});
+        } else if (cmp == ECOMP::Ex) {
+            scaled = std::mdspan(Ex_.data_handle(), Ex_.mapping(), fdtdcpml::ScalingAccessor<double>{x_step_});
+        } else if (cmp == ECOMP::Ey) {
+            scaled = std::mdspan(Ey_.data_handle(), Ey_.mapping(), fdtdcpml::ScalingAccessor<double>{y_step_});
+        } else if (cmp == ECOMP::Ez) {
+            scaled = std::mdspan(Ez_.data_handle(), Ez_.mapping(), fdtdcpml::ScalingAccessor<double>{z_step_});
+        }
+
+        if (pqr == EPQRS::P) {
+            sliced = SlicedSpan2D(std::submdspan(scaled, v, std::full_extent, std::full_extent));
+        } else if (pqr == EPQRS::Q) {
+            sliced = SlicedSpan2D(std::submdspan(scaled, std::full_extent, v, std::full_extent));
+        } else if (pqr == EPQRS::R) {
+            sliced = SlicedSpan2D(std::submdspan(scaled, std::full_extent, std::full_extent, v));
+        }
+
+        return sliced;
+
+    }
 
     // Calculate default time step...
 
@@ -136,10 +173,6 @@ public:
         std::size_t q_abs_l = 10, std::size_t q_abs_h = 10,
         std::size_t r_abs_l = 10, std::size_t r_abs_h = 10
     );
-
-    //
-
-    double t_ = 0.0;
 
     //
 
@@ -228,15 +261,16 @@ private:
 
     //
 
-    void minmax() {
-
+    void H_minmax() {
         std::tie(Hx_min, Hx_max, Hx_min_pqr, Hx_max_pqr) = view_minmax(rawHx_, Hx_); 
         std::tie(Hy_min, Hy_max, Hy_min_pqr, Hy_max_pqr) = view_minmax(rawHy_, Hy_);
         std::tie(Hz_min, Hz_max, Hz_min_pqr, Hz_max_pqr) = view_minmax(rawHz_, Hz_);
+    }
+
+    void E_minmax() {
         std::tie(Ex_min, Ex_max, Ex_min_pqr, Ex_max_pqr) = view_minmax(rawEx_, Ex_); 
         std::tie(Ey_min, Ey_max, Ey_min_pqr, Ey_max_pqr) = view_minmax(rawEy_, Ey_);
         std::tie(Ez_min, Ez_max, Ez_min_pqr, Ez_max_pqr) = view_minmax(rawEz_, Ez_);
-
     }
 
     std::tuple<double, double, PQR, PQR> view_minmax(GridRaw v1d, GridView v3d) {
