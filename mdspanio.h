@@ -42,7 +42,7 @@ write_binary(std::ofstream& ofs, T val)
 
 template <typename T, typename Extents, typename Layout, typename Accessor>
 void
-write_mdspan(std::ofstream& ofs, std::mdspan<T, Extents, Layout, Accessor> span)
+write_mdspan_binary(std::ofstream& ofs, std::mdspan<T, Extents, Layout, Accessor> span)
 {
 
     write_binary(ofs, span.rank());
@@ -60,6 +60,41 @@ write_mdspan(std::ofstream& ofs, std::mdspan<T, Extents, Layout, Accessor> span)
                 self(self, indices..., i);
             }
         }
+    };
+
+    write_recursive(write_recursive);
+
+}
+
+template <typename T>
+void
+write_text(std::ostream& os, T val) {
+    os << val << " ";
+}
+
+template <typename T, typename Extents, typename Layout, typename Accessor>
+void
+write_mdspan_text(std::ostream& os, std::mdspan<T, Extents, Layout, Accessor> span, std::string comment = "") {
+
+    os << "Comment: " << comment << "\n";
+    os << "Rank: " << span.rank() << "\n";
+    os << "Extents: ";
+    for (std::size_t i = 0; i < span.rank(); ++i) {
+        os << span.extent(i) << (i == span.rank() - 1 ? "" : ", ");
+    }
+    os << "\n";
+    os << "Data:\n";
+
+    auto write_recursive = [&](auto& self, auto... indices) {
+        if constexpr (sizeof...(indices) == Extents::rank()) {
+            write_text(os, span[indices...]);
+        } else {
+            std::size_t dim = sizeof...(indices);
+            for (std::size_t i = 0; i < span.extent(dim); ++i) {
+                self(self, indices..., i);
+            }
+            os << "\n";
+       }
     };
 
     write_recursive(write_recursive);

@@ -23,19 +23,19 @@ void FDTDCPML::step() {
 
     fdtd_H(); 
 
-//    H_source();
+    H_source();
 
-//    cpml_x_l_H(); cpml_x_h_H();
-//    cpml_y_l_H(); cpml_y_h_H();
-//    cpml_z_l_H(); cpml_z_h_H();
+    cpml_x_l_H(); cpml_x_h_H();
+    cpml_y_l_H(); cpml_y_h_H();
+    cpml_z_l_H(); cpml_z_h_H();
 
     fdtd_E();
 
-//    E_source();
+    E_source();
 
-//    cpml_x_l_E(); cpml_x_h_E();
-//    cpml_y_l_E(); cpml_y_h_E();
-//    cpml_z_l_E(); cpml_z_h_E();
+    cpml_x_l_E(); cpml_x_h_E();
+    cpml_y_l_E(); cpml_y_h_E();
+    cpml_z_l_E(); cpml_z_h_E();
 
     t_ += t_step_;
 
@@ -142,12 +142,12 @@ FDTDCPML::FDTDCPML(
     EzEz_  (rawEzEz_.data(),   p_, q_, r_ - 1),
     EzHxHy_(rawEzHxHy_.data(), p_, q_, r_ - 1),
 
-    psi_x_l_(q_ - 1, r_ - 1, p_abs_l_, x_step_, t_step_),
-    psi_x_h_(q_ - 1, r_ - 1, p_abs_h_, x_step_, t_step_),
-    psi_y_l_(p_ - 1, q_abs_l_, r_ - 1, y_step_, t_step_),
-    psi_y_h_(p_ - 1, q_abs_h_, r_ - 1, y_step_, t_step_),
-    psi_z_l_(p_ - 1, q_ - 1, r_abs_l_, z_step_, t_step_),
-    psi_z_h_(p_ - 1, q_ - 1, r_abs_h_, z_step_, t_step_)
+    psi_x_l_(q_, r_, p_abs_l_, x_step_, t_step_),
+    psi_x_h_(q_, r_, p_abs_h_, x_step_, t_step_),
+    psi_y_l_(p_, r_, q_abs_l_, y_step_, t_step_),
+    psi_y_h_(p_, r_, q_abs_h_, y_step_, t_step_),
+    psi_z_l_(p_, q_, r_abs_l_, z_step_, t_step_),
+    psi_z_h_(p_, q_, r_abs_h_, z_step_, t_step_)
 
 {
 
@@ -191,42 +191,6 @@ FDTDCPML::FDTDCPML(
         Ez_min, Ez_min_pqr.p, Ez_min_pqr.q, Ez_min_pqr.r,
         Ez_max, Ez_max_pqr.p, Ez_max_pqr.q, Ez_max_pqr.r);
 
-    // Test views...
-
-    std::print("Ex_extent(0) = {}, p_ - 1 = {}, ", Ex_.extent(0), p_ - 1);
-    std::print("Ex_extent(1) = {}, q_ - 1 = {}, ", Ex_.extent(1), q_ - 1);
-    std::print("Ex_extent(2) = {}, r_ - 1 = {}.", Ex_.extent(2), r_ - 1);
-
-    auto d0 = std::views::iota((size_t) 0, Ex_.extent(0));
-    auto d1 = std::views::iota((size_t) 0, Ex_.extent(1));
-    auto d2 = std::views::iota((size_t) 0, Ex_.extent(2));
-
-    for (auto [i0, i1, i2] : std::views::cartesian_product(d0, d1, d2)) {
-        Ex_[i0, i1, i2] = 0.;
-        ExEx_[i0, i1, i2] = 0.;
-        ExHyHz_[i0, i1, i2] = 0.;
-        std::print("1 Ex_[{}, {}, {}] = {}, ", i0, i1, i2, Ex_[i0, i1, i2]);
-        std::print("ExEx_[{}, {}, {}] = {}, ", i0, i1, i2, ExEx_[i0, i1, i2]);
-        std::print("ExHyHz_[{}, {}, {}] = {}.\n", i0, i1, i2, ExHyHz_[i0, i1, i2]);
-    }
-
-    std::print("\n");
-
-    auto gridEx = std::views::cartesian_product(
-        std::views::iota((size_t) 0, p_ - 1),
-        std::views::iota((size_t) 1, q_ - 1),
-        std::views::iota((size_t) 1, r_ - 1));
-
-    std::for_each(gridEx.begin(), gridEx.end(), [&](auto tuple) {
-        auto [i0, i1, i2] = tuple;
-        Ex_[i0, i1, i2] = 0.;
-        ExEx_[i0, i1, i2] = 0.;
-        ExHyHz_[i0, i1, i2] = 0.;
-        std::print("2 Ex_[{}, {}, {}] = {}, ", i0, i1, i2, Ex_[i0, i1, i2]);
-        std::print("ExEx_[{}, {}, {}] = {}, ", i0, i1, i2, ExEx_[i0, i1, i2]);
-        std::print("ExHyHz_[{}, {}, {}] = {}.\n", i0, i1, i2, ExHyHz_[i0, i1, i2]);
-    });
-
     std::print("\n");
 
     #endif
@@ -244,17 +208,19 @@ FDTDCPML::E_source()
 
     double x0 = std::lerp(x_min_, x_max_, 0.5);
     double y0 = std::lerp(y_min_, y_max_, 0.5);
-    double z0 = std::lerp(z_min_, z_max_, 0.2);
+    double z0 = std::lerp(z_min_, z_max_, 0.25);
 
     double f = 1.0e9;  // 1 GGz
 
     int l = 2.0;
     int n = 2.0;
-    double w = std::min(x_max_ - x_min_, y_max_ - y_min_) / 8.0;
+    double w = std::min(x_max_ - x_min_, y_max_ - y_min_) / 10.0;
 
     E_source_LG(t_, x0, y0, z0, f, n, l, w);
 
 }
+
+// Laguerre Gauss additive source...
 
 void
 FDTDCPML::E_source_LG(double t, double x0, double y0, double z0, double freq, int n, int l, double w)
